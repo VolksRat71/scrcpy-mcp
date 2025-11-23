@@ -1,6 +1,9 @@
 import base64
 import io
 import logging
+import os
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 import adbutils
@@ -25,28 +28,28 @@ def get_device() -> adbutils.AdbDevice:
 @mcp.tool()
 def get_screenshot() -> str:
     """
-    Take a screenshot of the connected device and return it as a base64 encoded PNG string.
+    Take a screenshot of the connected device and save it to ~/Downloads.
+    Returns the path to the saved screenshot.
     """
     try:
         device = get_device()
-        # adbutils sync.screencap returns a PIL Image or bytes?
-        # Looking at adbutils docs/source, device.screenshot() returns a PIL Image.
-        # Let's verify if adbutils has .screenshot() or we need to use shell.
-        # adbutils usually has a screenshot method.
-
-        # If adbutils doesn't have it directly on device, we can use:
-        # png_bytes = device.shell("screencap -p", encoding=None)
-
-        # Let's try the cleaner adbutils way if possible, but fallback to shell for reliability.
-        # Actually, adbutils.AdbDevice has a sync object which might have it, or maybe just shell.
-        # Let's use the shell method to be safe and dependency-light if adbutils changes.
-
         png_bytes = device.shell("screencap -p", encoding=None)
 
         if not png_bytes:
             raise RuntimeError("Failed to capture screenshot")
 
-        return base64.b64encode(png_bytes).decode("utf-8")
+        # Save to Downloads folder
+        downloads_dir = Path.home() / "Downloads"
+        downloads_dir.mkdir(exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"screenshot_{timestamp}.png"
+        filepath = downloads_dir / filename
+
+        with open(filepath, "wb") as f:
+            f.write(png_bytes)
+
+        return f"Screenshot saved to: {filepath}"
     except Exception as e:
         logger.error(f"Screenshot failed: {e}")
         raise RuntimeError(f"Screenshot failed: {str(e)}")
